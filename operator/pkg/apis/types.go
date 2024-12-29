@@ -21,7 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubetype-gen
 // +kubetype-gen:groupVersion=install.dubbo.io/v1alpha1
@@ -35,27 +34,33 @@ type DubboOperator struct {
 }
 
 type DubboOperatorSpec struct {
-	Profile string `json:"profile,omitempty"`
-	Namespace string `json:"namespace,omitempty"`
-	Revision string `json:"revision,omitempty"`
+	Profile    string              `json:"profile,omitempty"`
+	Namespace  string              `json:"namespace,omitempty"`
+	Revision   string              `json:"revision,omitempty"`
 	Components *DubboComponentSpec `json:"components,omitempty"`
-	Values json.RawMessage `json:"values,omitempty"`
-	UnvalidatedValues any `json:"unvalidatedValues,omitempty"`
+	Values     json.RawMessage     `json:"values,omitempty"`
 }
 
 type DubboComponentSpec struct {
-	Base    *BaseComponentSpec `json:"base,omitempty"`
+	Base  *BaseComponentSpec  `json:"base,omitempty"`
+	Admin *ComponentSpec `json:"admin,omitempty"`
 }
 
 type BaseComponentSpec struct {
-	Enabled    *BoolValue           `json:"enabled,omitempty"`
-}
-type ComponentSpec struct {
 	Enabled *BoolValue `json:"enabled,omitempty"`
-	Namespace string `json:"namespace,omitempty"`
-	Raw map[string]any `json:"-"`
 }
 
+type ComponentSpec struct {
+	Enabled   *BoolValue     `json:"enabled,omitempty"`
+	Namespace string         `json:"namespace,omitempty"`
+	Raw       map[string]any `json:"-"`
+}
+
+type MetadataCompSpec struct {
+	ComponentSpec
+	Name  string            `json:"name,omitempty"`
+	Label map[string]string `json:"label,omitempty"`
+}
 
 type BoolValue struct {
 	bool

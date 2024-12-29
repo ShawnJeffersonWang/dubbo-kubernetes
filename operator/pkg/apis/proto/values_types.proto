@@ -1,0 +1,67 @@
+syntax = 'proto3';
+
+package dubbo.operator.v1alpha1;
+
+import "google/protobuf/wrappers.proto";
+
+option go_package = "dubbo.io/dubbo/operator/pkg/apis";
+
+message ArchConfig {
+  // Sets pod scheduling weight for amd64 arch
+  uint32 amd64 = 1;
+
+  // Sets pod scheduling weight for ppc64le arch.
+  uint32 ppc64le = 2;
+
+  // Sets pod scheduling weight for s390x arch.
+  uint32 s390x = 3;
+
+  // Sets pod scheduling weight for arm64 arch.
+  uint32 arm64 = 4;
+}
+
+// Global Configuration for Dubbo components.
+message GlobalConfig {
+  // Deprecated: replaced by the affinity k8s settings which allows architecture nodeAffinity configuration of this behavior.
+  ArchConfig arch = 1 [deprecated = true];
+
+  // Controls whether the server-side validation is enabled.
+  google.protobuf.BoolValue configValidation = 2;
+
+  // Specifies the default namespace for the dubbo control plane components.
+  string dubboNamespace = 14;
+}
+
+message BaseConfig {
+  google.protobuf.BoolValue enabledubboConfigCRDs = 1;
+  GlobalConfig global = 2; // Add this line if `global` is required in BaseConfig
+}
+
+message Values {
+  // Global configuration for dubbo components.
+  GlobalConfig global = 1;
+
+  // Configuration for the base component.
+  BaseConfig base = 2;
+
+  // Specifies which installation configuration profile to apply.
+  string profile = 4;
+}
+
+// IntOrString is a type that can hold an int32 or a string.  When used in
+// JSON or YAML marshalling and unmarshalling, it produces or consumes the
+// inner type.  This allows you to have, for example, a JSON field that can
+// accept a name or number.
+// TODO: Rename to Int32OrString
+//
+// +protobuf=true
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +k8s:openapi-gen=true
+message IntOrString {
+  int64 type = 1;
+
+  google.protobuf.Int32Value intVal = 2;
+
+  google.protobuf.StringValue strVal = 3;
+}
+
