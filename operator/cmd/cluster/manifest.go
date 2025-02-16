@@ -14,37 +14,37 @@ import (
 	"strings"
 )
 
-type ManifestGenerateArgs struct {
+type manifestGenerateArgs struct {
 	files        []string
 	sets         []string
 	manifestPath string
 }
 
-func (a *ManifestGenerateArgs) String() string {
+func (a *manifestGenerateArgs) String() string {
 	var b strings.Builder
-	b.WriteString("files:   " + fmt.Sprint(a.files) + "\n")
+	b.WriteString("filenames:   " + fmt.Sprint(a.files) + "\n")
 	b.WriteString("sets:           " + fmt.Sprint(a.sets) + "\n")
 	b.WriteString("manifestPath: " + a.manifestPath + "\n")
 	return b.String()
 }
 
-func addManifestGenerateFlags(cmd *cobra.Command, args *ManifestGenerateArgs) {
-	cmd.PersistentFlags().StringSliceVarP(&args.files, "filename", "f", nil, "")
-	cmd.PersistentFlags().StringArrayVarP(&args.sets, "set", "s", nil, "")
-	cmd.PersistentFlags().StringVarP(&args.manifestPath, "manifests", "d", "", "")
+func addManifestGenerateFlags(cmd *cobra.Command, args *manifestGenerateArgs) {
+	cmd.PersistentFlags().StringSliceVarP(&args.files, "filename", "f", nil, ``)
+	cmd.PersistentFlags().StringArrayVarP(&args.sets, "set", "s", nil, ``)
+	cmd.PersistentFlags().StringVarP(&args.manifestPath, "manifests", "d", "", ``)
 }
 
 func ManifestCmd(ctx cli.Context) *cobra.Command {
 	rootArgs := &RootArgs{}
-	mgcArgs := &ManifestGenerateArgs{}
-	mgc := ManifestGenerateCmd(ctx, rootArgs, mgcArgs)
+	mgcArgs := &manifestGenerateArgs{}
+	mgc := manifestGenerateCmd(ctx, rootArgs, mgcArgs)
 	mc := &cobra.Command{
 		Use:   "manifest",
 		Short: "dubbo manifest related commands",
-		Long:  "The manifest command will generates and diffs dubbo manifests.",
+		Long:  "The manifest command will generates dubbo manifests.",
 	}
-	addFlags(mc, rootArgs)
-	addFlags(mgc, rootArgs)
+	AddFlags(mc, rootArgs)
+	AddFlags(mgc, rootArgs)
 	addManifestGenerateFlags(mgc, mgcArgs)
 	mc.AddCommand(mgc)
 	return mc
@@ -52,23 +52,19 @@ func ManifestCmd(ctx cli.Context) *cobra.Command {
 
 var kubeClientFunc func() (kube.CLIClient, error)
 
-func ManifestGenerateCmd(ctx cli.Context, _ *RootArgs, mgArgs *ManifestGenerateArgs) *cobra.Command {
+func manifestGenerateCmd(ctx cli.Context, _ *RootArgs, mgArgs *manifestGenerateArgs) *cobra.Command {
 	return &cobra.Command{
 		Use:   "generate",
 		Short: "Generates an Dubbo install manifest",
 		Long:  "The generate subcommand generates an Dubbo install manifest and outputs to the console by default.",
-		Example: `  # Generate a default Istio installation
-  istioctl manifest generate
-
+		Example: `  # Generate a default Dubbo installation
+  dubboctl manifest generate
+  
   # Generate the demo profile
-  istioctl manifest generate --set profile=demo
+  dubboctl manifest generate --set profile=demo
 `,
-		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) != 0 {
-				return fmt.Errorf("generate accepts no positional arguments, got %#v", args)
-			}
-			return nil
-		},
+
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if kubeClientFunc == nil {
 				kubeClientFunc = ctx.CLIClient
@@ -80,8 +76,8 @@ func ManifestGenerateCmd(ctx cli.Context, _ *RootArgs, mgArgs *ManifestGenerateA
 			}
 			kubeClient = kc
 
-			cl := clog.NewConsoleLogger(cmd.OutOrStdout(), cmd.ErrOrStderr(), installerScope)
-			return ManifestGenerate(kubeClient, mgArgs, cl)
+			cl := clog.NewConsoleLogger(cmd.OutOrStdout(), cmd.ErrOrStderr(), InstallerScope)
+			return manifestGenerate(kubeClient, mgArgs, cl)
 		},
 	}
 }
@@ -90,7 +86,7 @@ const (
 	YAMLSeparator = "\n---\n"
 )
 
-func ManifestGenerate(kc kube.CLIClient, mgArgs *ManifestGenerateArgs, cl clog.Logger) error {
+func manifestGenerate(kc kube.CLIClient, mgArgs *manifestGenerateArgs, cl clog.Logger) error {
 	setFlags := applyFlagAliases(mgArgs.sets, mgArgs.manifestPath)
 	manifests, _, err := render.GenerateManifest(mgArgs.files, setFlags, cl, kc)
 	if err != nil {

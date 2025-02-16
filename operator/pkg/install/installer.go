@@ -41,15 +41,11 @@ func (i Installer) install(manifests []manifest.ManifestSet) error {
 		return err
 	}
 
-	disabledComponents := sets.New(slices.Map(
-		component.AllComponents,
-		func(cc component.Component) component.Name {
-			return cc.UserFacingName
-		},
-	)...)
-	dependencyWaitCh := dependenciesChs()
+	disabledComponents := sets.New(slices.Map(component.AllComponents, func(e component.Component) component.Name {
+		return e.UserFacingName
+	})...)
+	dependencyWaitCh := dependenciesChannels()
 	for _, mfs := range manifests {
-		mfs := mfs
 		c := mfs.Components
 		m := mfs.Manifests
 		disabledComponents.Delete(c)
@@ -69,6 +65,7 @@ func (i Installer) install(manifests []manifest.ManifestSet) error {
 			for _, ch := range componentDependencies[c] {
 				dependencyWaitCh[ch] <- struct{}{}
 			}
+
 		}()
 	}
 	for cc := range disabledComponents {
@@ -89,7 +86,19 @@ func (i Installer) install(manifests []manifest.ManifestSet) error {
 }
 
 func (i Installer) InstallManifests(manifests []manifest.ManifestSet) error {
+	err := i.installSystemNamespace()
+	if err != nil {
+		return err
+	}
 	if err := i.install(manifests); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (i Installer) installSystemNamespace() error {
+	ns := i.Values.GetPathStringOr("metadata.namespace", "dubbo-system")
+	if err := util.CreateNamespace(i.Kube.Kube(), ns, i.DryRun); err != nil {
 		return err
 	}
 	return nil
@@ -110,18 +119,18 @@ func (i Installer) applyManifestSet(manifestSet manifest.ManifestSet) error {
 		}
 		pi.ReportProgress()
 	}
-	//if err := WaitForResources(manifests, i.Kube, i.WaitTimeout, i.DryRun, pi); err != nil {
-	//	werr := fmt.Errorf("failed to wait for resource: %v", err)
-	//	pi.ReportError(werr.Error())
-	//	return werr
-	//}
+	if err := WaitForResources(manifests, i.Kube, i.WaitTimeout, i.DryRun, pi); err != nil {
+		werr := fmt.Errorf("failed to wait for resource: %v", err)
+		pi.ReportError(werr.Error())
+		return werr
+	}
 	pi.ReportFinished()
 	return nil
 }
 
 func (i Installer) serverSideApply(obj manifest.Manifest) error {
 	var dryRun []string
-	const FieldOwner = ""
+	const fieldManager = "dubbo-operator"
 	dc, err := i.Kube.DynamicClientFor(obj.GroupVersionKind(), obj.Unstructured, "")
 	if err != nil {
 		return err
@@ -133,7 +142,7 @@ func (i Installer) serverSideApply(obj manifest.Manifest) error {
 	}
 	if _, err := dc.Patch(context.TODO(), obj.GetName(), types.ApplyPatchType, []byte(obj.Content), metav1.PatchOptions{
 		DryRun:       dryRun,
-		FieldManager: FieldOwner,
+		FieldManager: fieldManager,
 	}); err != nil {
 		return fmt.Errorf("failed to update resource with server-side apply for obj %v: %v", objStr, err)
 	}
@@ -205,26 +214,27 @@ func (i Installer) prune(manifests []manifest.ManifestSet) error {
 			}
 		}
 	}
-	return errs.ToErrors()
+	return errs.ToError()
 }
 
 var componentDependencies = map[component.Name][]component.Name{
-	component.BaseComponentName: {},
-	component.AdminComponentName: {
-		component.BaseComponentName,
+	component.RegisterComponentName: {},
+	component.BaseComponentName: {
+		component.RegisterComponentName,
+		component.AdminComponentName,
 	},
+	component.AdminComponentName: {},
 }
 
-func dependenciesChs() map[component.Name]chan struct{} {
-	r := make(map[component.Name]chan struct{})
+func dependenciesChannels() map[component.Name]chan struct{} {
+	ret := make(map[component.Name]chan struct{})
 	for _, parent := range componentDependencies {
 		for _, child := range parent {
-			r[child] = make(chan struct{}, 1)
+			ret[child] = make(chan struct{}, 1)
 		}
 	}
-	return r
+	return ret
 }
-
 func getOwnerLabels(dop values.Map, c string) map[string]string {
 	labels := make(map[string]string)
 

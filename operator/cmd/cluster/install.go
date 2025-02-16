@@ -15,29 +15,32 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 )
 
-var installerScope = log.RegisterScope("installer")
+var InstallerScope = log.RegisterScope("installer")
 
 type installArgs struct {
 	files            []string
 	sets             []string
 	manifestPath     string
+	waitTimeout      time.Duration
 	skipConfirmation bool
 }
 
 func (i *installArgs) String() string {
 	var b strings.Builder
-	b.WriteString("files:    " + (fmt.Sprint(i.files) + "\n"))
+	b.WriteString("filenames:    " + (fmt.Sprint(i.files) + "\n"))
 	b.WriteString("sets:    " + (fmt.Sprint(i.sets) + "\n"))
-	b.WriteString("manifestPath:    " + (fmt.Sprint(i.manifestPath) + "\n"))
+	b.WriteString("waitTimeout: " + fmt.Sprint(i.waitTimeout) + "\n")
 	return b.String()
 }
 
 func addInstallFlags(cmd *cobra.Command, args *installArgs) {
-	cmd.PersistentFlags().StringSliceVarP(&args.files, "files", "f", nil, `Path to the file containing the dubboOperator's custom resources`)
-	cmd.PersistentFlags().StringArrayVarP(&args.sets, "set", "s", nil, `Override dubboOperator values, such as selecting profiles, etc`)
-
+	cmd.PersistentFlags().StringSliceVarP(&args.files, "filenames", "f", nil, `Path to the file containing the dubboOperator's custom resources.`)
+	cmd.PersistentFlags().StringArrayVarP(&args.sets, "set", "s", nil, `Override dubboOperator values, such as selecting profiles, etc.`)
+	cmd.PersistentFlags().BoolVarP(&args.skipConfirmation, "skip-confirmation", "y", false, `The skipConfirmation determines whether the user is prompted for confirmation.`)
+	cmd.PersistentFlags().DurationVar(&args.waitTimeout, "wait-timeout", 300*time.Second, "Maximum time to wait for Dubbo resources in each component to be ready.")
 }
 
 func InstallCmd(ctx cli.Context) *cobra.Command {
@@ -66,12 +69,12 @@ func InstallCmdWithArgs(ctx cli.Context, rootArgs *RootArgs, iArgs *installArgs)
 				return err
 			}
 			p := NewPrinterForWriter(cmd.OutOrStderr())
-			cl := clog.NewConsoleLogger(cmd.OutOrStdout(), cmd.ErrOrStderr(), installerScope)
+			cl := clog.NewConsoleLogger(cmd.OutOrStdout(), cmd.ErrOrStderr(), InstallerScope)
 			p.Printf("%v\n", art.DubboColoredArt())
 			return Install(kubeClient, rootArgs, iArgs, cl, cmd.OutOrStdout(), p)
 		},
 	}
-	addFlags(ic, rootArgs)
+	AddFlags(ic, rootArgs)
 	addInstallFlags(ic, iArgs)
 	return ic
 }
@@ -84,7 +87,7 @@ func Install(kubeClient kube.CLIClient, rootArgs *RootArgs, iArgs *installArgs, 
 	}
 	profile := pointer.NonEmptyOrDefault(vals.GetPathString("spec.profile"), "default")
 	if !rootArgs.DryRun && !iArgs.skipConfirmation {
-		prompt := fmt.Sprintf("You are currently selecting the %q profile to install into the cluster. Do you want to proceed? (y/N)", profile)
+		prompt := fmt.Sprintf("The %q profile will be installed into the cluster. \nDo you want to proceed? (y/N)", profile)
 		if !OptionDeterminate(prompt, stdOut) {
 			p.Println("Canceled Completed.")
 			os.Exit(1)
@@ -95,6 +98,7 @@ func Install(kubeClient kube.CLIClient, rootArgs *RootArgs, iArgs *installArgs, 
 		SkipWait:     false,
 		Kube:         kubeClient,
 		Values:       vals,
+		WaitTimeout:  iArgs.waitTimeout,
 		ProgressInfo: progress.NewInfo(),
 		Logger:       cl,
 	}

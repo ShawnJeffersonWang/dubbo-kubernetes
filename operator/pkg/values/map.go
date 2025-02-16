@@ -3,7 +3,7 @@ package values
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/apache/dubbo-kubernetes/pkg/pointer"
+	"github.com/apache/dubbo-kubernetes/operator/pkg/util/pointer"
 	"path/filepath"
 	"reflect"
 	"sigs.k8s.io/yaml"
@@ -50,15 +50,6 @@ func MapFromYAML(input []byte) (Map, error) {
 func fromJSON[T any](overlay []byte) (T, error) {
 	v := new(T)
 	err := json.Unmarshal(overlay, &v)
-	if err != nil {
-		return pointer.Empty[T](), err
-	}
-	return *v, nil
-}
-
-func fromYAML[T any](overlay []byte) (T, error) {
-	v := new(T)
-	err := yaml.Unmarshal(overlay, &v)
 	if err != nil {
 		return pointer.Empty[T](), err
 	}
@@ -134,6 +125,10 @@ func splitPath(path string) []string {
 
 func (m Map) GetPathString(s string) string {
 	return GetPathHelper[string](m, s)
+}
+
+func (m Map) GetPathStringOr(s string, def string) string {
+	return pointer.NonEmptyOrDefault(m.GetPathString(s), def)
 }
 
 func GetPathHelper[T any](m Map, name string) T {

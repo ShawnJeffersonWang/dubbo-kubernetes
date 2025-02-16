@@ -6,9 +6,9 @@ import (
 	"github.com/apache/dubbo-kubernetes/operator/pkg/manifest"
 	"github.com/apache/dubbo-kubernetes/operator/pkg/util"
 	"github.com/apache/dubbo-kubernetes/operator/pkg/util/clog"
+	"github.com/apache/dubbo-kubernetes/operator/pkg/util/pointer"
 	"github.com/apache/dubbo-kubernetes/pkg/config/schema/gvk"
 	"github.com/apache/dubbo-kubernetes/pkg/kube"
-	"github.com/apache/dubbo-kubernetes/pkg/pointer"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -18,13 +18,20 @@ import (
 )
 
 var (
-	ClusterResources    = []schema.GroupVersionKind{}
-	ClusterCPResources  = []schema.GroupVersionKind{}
+	ClusterResources = []schema.GroupVersionKind{
+		{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRole"},
+		{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRoleBinding"},
+	}
+	ClusterControlPlaneResources = []schema.GroupVersionKind{
+		{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRole"},
+		{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRoleBinding"},
+	}
 	AllClusterResources = append(ClusterResources,
-		gvk.CustomResourceDefinition.Kubernetes())
+		gvk.CustomResourceDefinition.Kubernetes(),
+	)
 )
 
-func GetPrunedResources(kc kube.CLIClient, dopName, dopNamespace string, includeClusterResources bool) ([]*unstructured.UnstructuredList, error) {
+func GetRemovedResources(kc kube.CLIClient, dopName, dopNamespace string, includeClusterResources bool) ([]*unstructured.UnstructuredList, error) {
 	var usList []*unstructured.UnstructuredList
 	labels := make(map[string]string)
 	if dopName != "" {
@@ -34,7 +41,7 @@ func GetPrunedResources(kc kube.CLIClient, dopName, dopNamespace string, include
 		labels[manifest.OwningResourceNamespace] = dopNamespace
 	}
 	resources := NamespacedResources()
-	gvkList := append(resources, ClusterCPResources...)
+	gvkList := append(resources, ClusterControlPlaneResources...)
 	if includeClusterResources {
 		gvkList = append(resources, AllClusterResources...)
 	}
@@ -62,7 +69,17 @@ func GetPrunedResources(kc kube.CLIClient, dopName, dopNamespace string, include
 }
 
 func NamespacedResources() []schema.GroupVersionKind {
-	res := []schema.GroupVersionKind{}
+	res := []schema.GroupVersionKind{
+		gvk.Deployment.Kubernetes(),
+		gvk.StatefulSet.Kubernetes(),
+		gvk.Service.Kubernetes(),
+		gvk.Secret.Kubernetes(),
+		gvk.ServiceAccount.Kubernetes(),
+		gvk.Job.Kubernetes(),
+		gvk.Namespace.Kubernetes(), // TODO
+		{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "RoleBinding"},
+		{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "Role"},
+	}
 	return res
 }
 
@@ -79,13 +96,13 @@ func DeleteObjectsList(c kube.CLIClient, dryRun bool, log clog.Logger, objectsLi
 			}
 		}
 	}
-	return errs.ToErrors()
+	return errs.ToError()
 }
 
 func DeleteResource(kc kube.CLIClient, dryRun bool, _ clog.Logger, obj *unstructured.Unstructured) error {
 	name := fmt.Sprintf("%v/%s.%s", obj.GroupVersionKind(), obj.GetName(), obj.GetNamespace())
 	if dryRun {
-		fmt.Printf("Not pruning object %s because of dry run.", name)
+		fmt.Printf("Not remove object %s because of dry run.", name)
 		return nil
 	}
 

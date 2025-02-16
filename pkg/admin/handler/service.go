@@ -40,6 +40,12 @@ import (
 // API Definition: https://app.apifox.com/project/3732499
 // 资源详情-服务
 // service search
+
+const (
+	DEFAULT_TIMEOUT = 1000
+	DEFAULT_RETRIES = 2
+)
+
 func SearchServices(rt core_runtime.Runtime) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		req := model.NewServiceSearchReq()
@@ -130,12 +136,12 @@ func ServiceConfigTimeoutGET(rt core_runtime.Runtime) gin.HandlerFunc {
 		param := baseService{}
 		resp := struct {
 			Timeout int32 `json:"timeout"`
-		}{-1}
+		}{DEFAULT_TIMEOUT}
 		if err := param.query(c); err != nil {
 			c.JSON(http.StatusBadRequest, model.NewErrorResp(err.Error()))
 			return
 		}
-		res, err := getConfigurator(rt, param.toInterface())
+		res, err := service.GetConfigurator(rt, param.toInterface())
 		if err != nil {
 			if !core_store.IsResourceNotFound(err) {
 				c.JSON(http.StatusBadRequest, model.NewErrorResp(err.Error()))
@@ -163,7 +169,7 @@ func getServiceTimeout(conf *mesh_proto.OverrideConfig) (int32, bool) {
 			return int32(timeout), true
 		}
 	}
-	return -1, false
+	return DEFAULT_TIMEOUT, false
 }
 
 func ServiceConfigTimeoutPUT(rt core_runtime.Runtime) gin.HandlerFunc {
@@ -178,7 +184,7 @@ func ServiceConfigTimeoutPUT(rt core_runtime.Runtime) gin.HandlerFunc {
 		}
 
 		isExist := true
-		res, err := getConfigurator(rt, param.toInterface())
+		res, err := service.GetConfigurator(rt, param.toInterface())
 		if err != nil {
 			if !core_store.IsResourceNotFound(err) {
 				c.JSON(http.StatusBadRequest, model.NewErrorResp(err.Error()))
@@ -204,13 +210,13 @@ func ServiceConfigTimeoutPUT(rt core_runtime.Runtime) gin.HandlerFunc {
 				Parameters:    map[string]string{`timeout`: strconv.Itoa(int(param.Timeout))},
 				XGenerateByCp: true,
 			})
-			err = createConfigurator(rt, param.toInterface(), res)
+			err = service.CreateConfigurator(rt, param.toInterface(), res)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, model.NewErrorResp(err.Error()))
 				return
 			}
 		} else {
-			err = updateConfigurator(rt, param.toInterface(), res)
+			err = service.UpdateConfigurator(rt, param.toInterface(), res)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, model.NewErrorResp(err.Error()))
 				return
@@ -225,12 +231,12 @@ func ServiceConfigRetryGET(rt core_runtime.Runtime) gin.HandlerFunc {
 		param := baseService{}
 		resp := struct {
 			RetryTimes int32 `json:"retryTimes"`
-		}{-1}
+		}{DEFAULT_RETRIES}
 		if err := param.query(c); err != nil {
 			c.JSON(http.StatusBadRequest, model.NewErrorResp(err.Error()))
 			return
 		}
-		res, err := getConfigurator(rt, param.toInterface())
+		res, err := service.GetConfigurator(rt, param.toInterface())
 		if err != nil {
 			if !core_store.IsResourceNotFound(err) {
 				c.JSON(http.StatusBadRequest, model.NewErrorResp(err.Error()))
@@ -258,7 +264,7 @@ func getServiceRetryTimes(conf *mesh_proto.OverrideConfig) (int32, bool) {
 			return int32(retries), true
 		}
 	}
-	return -1, false
+	return DEFAULT_RETRIES, false
 }
 
 func ServiceConfigRetryPUT(rt core_runtime.Runtime) gin.HandlerFunc {
@@ -273,7 +279,7 @@ func ServiceConfigRetryPUT(rt core_runtime.Runtime) gin.HandlerFunc {
 		}
 
 		isExist := true
-		res, err := getConfigurator(rt, param.toInterface())
+		res, err := service.GetConfigurator(rt, param.toInterface())
 		if err != nil {
 			if !core_store.IsResourceNotFound(err) {
 				c.JSON(http.StatusBadRequest, model.NewErrorResp(err.Error()))
@@ -297,13 +303,13 @@ func ServiceConfigRetryPUT(rt core_runtime.Runtime) gin.HandlerFunc {
 		})
 
 		if !isExist {
-			err = createConfigurator(rt, param.toInterface(), res)
+			err = service.CreateConfigurator(rt, param.toInterface(), res)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, model.NewErrorResp(err.Error()))
 				return
 			}
 		} else {
-			err = updateConfigurator(rt, param.toInterface(), res)
+			err = service.UpdateConfigurator(rt, param.toInterface(), res)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, model.NewErrorResp(err.Error()))
 				return
@@ -428,7 +434,7 @@ func ServiceConfigArgumentRouteGET(rt core_runtime.Runtime) gin.HandlerFunc {
 			return
 		}
 
-		rawRes, err := getConditionRule(rt, param.toInterface())
+		rawRes, err := service.GetConditionRule(rt, param.toInterface())
 		if err != nil {
 			if !core_store.IsResourceNotFound(err) {
 				c.JSON(http.StatusBadRequest, model.NewErrorResp(err.Error()))
@@ -467,7 +473,7 @@ func ServiceConfigArgumentRoutePUT(rt core_runtime.Runtime) gin.HandlerFunc {
 		}
 
 		isExist := true
-		rawRes, err := getConditionRule(rt, param.toInterface())
+		rawRes, err := service.GetConditionRule(rt, param.toInterface())
 		if err != nil {
 			if !core_store.IsResourceNotFound(err) {
 				c.JSON(http.StatusBadRequest, model.NewErrorResp(err.Error()))
@@ -497,13 +503,13 @@ func ServiceConfigArgumentRoutePUT(rt core_runtime.Runtime) gin.HandlerFunc {
 		rawRes.Spec = res.ToConditionRoute()
 
 		if isExist {
-			err = updateConditionRule(rt, param.toInterface(), rawRes)
+			err = service.UpdateConditionRule(rt, param.toInterface(), rawRes)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, model.NewErrorResp(err.Error()))
 				return
 			}
 		} else {
-			err = createConditionRule(rt, param.toInterface(), rawRes)
+			err = service.CreateConditionRule(rt, param.toInterface(), rawRes)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, model.NewErrorResp(err.Error()))
 				return

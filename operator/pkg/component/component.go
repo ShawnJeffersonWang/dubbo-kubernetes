@@ -9,18 +9,10 @@ import (
 type Name string
 
 const (
-	BaseComponentName  Name = "Base"
-	AdminComponentName Name = "Admin"
+	BaseComponentName     Name = "Base"
+	AdminComponentName    Name = "Admin"
+	RegisterComponentName Name = "Register"
 )
-
-type Component struct {
-	UserFacingName Name
-	SpecName       string
-	Default        bool
-	HelmSubDir     string
-	HelmTreeRoot   string
-	FlattenValues  bool
-}
 
 var AllComponents = []Component{
 	{
@@ -35,19 +27,37 @@ var AllComponents = []Component{
 		SpecName:       "admin",
 		Default:        true,
 		HelmSubDir:     "admin",
-		HelmTreeRoot:   "admin.global",
+		HelmTreeRoot:   "",
 	},
+	{
+		UserFacingName: RegisterComponentName,
+		SpecName:       "register",
+		Default:        true,
+		HelmSubDir:     "dubbo-control/register-discovery",
+		HelmTreeRoot:   "",
+	},
+}
+
+type Component struct {
+	UserFacingName Name
+	SpecName       string
+	Default        bool
+	HelmSubDir     string
+	HelmTreeRoot   string
+	FlattenValues  bool
 }
 
 var (
 	userFacingCompNames = map[Name]string{
-		BaseComponentName:  "Dubbo Core",
-		AdminComponentName: "Dubbo Dashboard or Control Plane",
+		BaseComponentName:     "Dubbo Core",
+		AdminComponentName:    "Dubbo Dashboard",
+		RegisterComponentName: "Dubbo Register Plane",
 	}
 
 	Icons = map[Name]string{
-		BaseComponentName:  "🛸",
-		AdminComponentName: "🛰✗📡",
+		BaseComponentName:     "🛸",
+		RegisterComponentName: "📡",
+		AdminComponentName:    "🛰",
 	}
 )
 
@@ -78,6 +88,8 @@ func (c Component) Get(merged values.Map) ([]apis.MetadataCompSpec, error) {
 
 		if spec.Namespace == "" {
 			spec.Namespace = defaultNamespace
+		}
+		if spec.Namespace == "" {
 			spec.Namespace = "dubbo-system"
 		}
 		spec.Raw = m
